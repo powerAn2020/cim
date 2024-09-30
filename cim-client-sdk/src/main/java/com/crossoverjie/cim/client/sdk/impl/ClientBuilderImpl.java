@@ -5,6 +5,7 @@ import com.crossoverjie.cim.client.sdk.ClientBuilder;
 import com.crossoverjie.cim.client.sdk.Event;
 import com.crossoverjie.cim.client.sdk.io.MessageListener;
 import com.crossoverjie.cim.client.sdk.io.ReconnectCheck;
+import com.crossoverjie.cim.client.sdk.io.backoff.BackoffStrategy;
 import com.crossoverjie.cim.common.util.StringUtil;
 import java.util.concurrent.ThreadPoolExecutor;
 import okhttp3.OkHttpClient;
@@ -12,7 +13,7 @@ import okhttp3.OkHttpClient;
 public class ClientBuilderImpl implements ClientBuilder {
 
 
-    private ClientConfigurationData conf;
+    private final ClientConfigurationData conf;
 
     public ClientBuilderImpl() {
         this(new ClientConfigurationData());
@@ -77,6 +78,12 @@ public class ClientBuilderImpl implements ClientBuilder {
     @Override
     public ClientBuilder callbackThreadPool(ThreadPoolExecutor callbackThreadPool) {
         this.conf.setCallbackThreadPool(callbackThreadPool);
+        return this;
+    }
+
+    @Override
+    public ClientBuilder backoffStrategy(BackoffStrategy backoffStrategy) {
+        this.conf.setBackoffStrategy(backoffStrategy);
         return this;
     }
 }

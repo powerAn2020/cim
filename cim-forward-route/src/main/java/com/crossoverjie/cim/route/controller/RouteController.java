@@ -23,6 +23,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.annotation.Resource;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,13 +48,13 @@ public class RouteController implements RouteApi {
     @Resource
     private MetaStore metaStore;
 
-    @Autowired
+    @Resource
     private AccountService accountService;
 
-    @Autowired
+    @Resource
     private UserInfoCacheService userInfoCacheService;
 
-    @Autowired
+    @Resource
     private CommonBizService commonBizService;
 
     @Resource
@@ -63,24 +64,23 @@ public class RouteController implements RouteApi {
     @RequestMapping(value = "groupRoute", method = RequestMethod.POST)
     @ResponseBody()
     @Override
-    public BaseResponse<NULLBody> groupRoute(@RequestBody ChatReqVO groupReqVO) throws Exception {
+    public BaseResponse<NULLBody> groupRoute(@RequestBody ChatReqVO groupReqVO) {
         BaseResponse<NULLBody> res = new BaseResponse();
 
         log.info("msg=[{}]", groupReqVO.toString());
 
-        //获取所有的推送列表
-        Map<Long, CIMServerResVO> serverResVOMap = accountService.loadRouteRelated();
-        for (Map.Entry<Long, CIMServerResVO> cimServerResVOEntry : serverResVOMap.entrySet()) {
-            Long userId = cimServerResVOEntry.getKey();
-            CIMServerResVO cimServerResVO = cimServerResVOEntry.getValue();
+        Map<Long, CIMServerResVO> serverResVoMap = accountService.loadRouteRelated();
+        for (Map.Entry<Long, CIMServerResVO> cimServerResVoEntry : serverResVoMap.entrySet()) {
+            Long userId = cimServerResVoEntry.getKey();
+            CIMServerResVO cimServerResVO = cimServerResVoEntry.getValue();
             if (userId.equals(groupReqVO.getUserId())) {
-                //过滤掉自己
-                CIMUserInfo cimUserInfo = userInfoCacheService.loadUserInfoByUserId(groupReqVO.getUserId());
-                log.warn("过滤掉了发送者 userId={}", cimUserInfo.toString());
+                // Skip the sender
+                Optional<CIMUserInfo> cimUserInfo = userInfoCacheService.loadUserInfoByUserId(groupReqVO.getUserId());
+                cimUserInfo.ifPresent(userInfo -> log.warn("skip send user userId={}", userInfo));
                 continue;
             }
 
-            //推送消息
+            // Push message
             ChatReqVO chatVO = new ChatReqVO(userId, groupReqVO.getMsg());
             accountService.pushMsg(cimServerResVO, groupReqVO.getUserId(), chatVO);
 
@@ -102,7 +102,7 @@ public class RouteController implements RouteApi {
     @RequestMapping(value = "p2pRoute", method = RequestMethod.POST)
     @ResponseBody()
     @Override
-    public BaseResponse<NULLBody> p2pRoute(@RequestBody P2PReqVO p2pRequest) throws Exception {
+    public BaseResponse<NULLBody> p2pRoute(@RequestBody P2PReqVO p2pRequest) {
         BaseResponse<NULLBody> res = new BaseResponse();
 
         try {
@@ -131,10 +131,12 @@ public class RouteController implements RouteApi {
     public BaseResponse<NULLBody> offLine(@RequestBody ChatReqVO groupReqVO) {
         BaseResponse<NULLBody> res = new BaseResponse();
 
-        CIMUserInfo cimUserInfo = userInfoCacheService.loadUserInfoByUserId(groupReqVO.getUserId());
+        Optional<CIMUserInfo> cimUserInfo = userInfoCacheService.loadUserInfoByUserId(groupReqVO.getUserId());
 
-        log.info("user [{}] offline!", cimUserInfo.toString());
-        accountService.offLine(groupReqVO.getUserId());
+        cimUserInfo.ifPresent(userInfo -> {
+            log.info("user [{}] offline!", userInfo.toString());
+            accountService.offLine(groupReqVO.getUserId());
+        });
 
         res.setCode(StatusEnum.SUCCESS.getCode());
         res.setMessage(StatusEnum.SUCCESS.getMessage());
